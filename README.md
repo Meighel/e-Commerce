@@ -2,5 +2,5 @@
 
 **Members:**
 
-Carla Jane Lagan
+Carla Jane Lagan  
 Meighel Nicolle Padon
