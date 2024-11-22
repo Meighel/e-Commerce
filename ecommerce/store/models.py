@@ -1,5 +1,7 @@
 import uuid
 from django.db import models
+from django.db.models import Q
+
 
 class User(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -24,6 +26,20 @@ class Order(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user'],
+                condition=models.Q(status='Pending'),
+                name='unique_pending_order_per_user'
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.status == 'Pending' and Order.objects.filter(user=self.user, status='Pending').exists():
+            raise ValueError("A user can only have one pending order.")
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Order {self.id} - {self.status}"
