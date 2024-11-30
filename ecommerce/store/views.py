@@ -13,7 +13,7 @@ class UserView(APIView):
 
     @swagger_auto_schema(
         operation_description="Create a new user",
-        request_body=UserSerializer,  # Specify the serializer for POST input
+        request_body=UserSerializer,  
         responses={201: UserSerializer(), 400: 'Invalid data'}
     )
     def post(self, request):
@@ -31,10 +31,10 @@ class UserView(APIView):
     def get(self, request, user_id=None):
         if user_id:
             try:
-                user = User.objects.get(id=user_id, is_superuser=False)
+                user = User.objects.get(id=user_id)
             except User.DoesNotExist:
                 return Response(
-                    {"error": "User not found or is a superuser"},
+                    {"error": "User not found"},
                     status=status.HTTP_404_NOT_FOUND,
                 )
             serializer = UserSerializer(user)
@@ -100,9 +100,14 @@ class CartItemView(APIView):
         responses={200: CartItemSerializer(many=True), 404: 'No cart items found'}
     )
 
-    def get(self, request):
+    def get(self, request, cart_item_id=None):
+
+        if cart_item_id:
+            try:
+                cart_item_id = CartItem.objects.get(id=cart_item_id)
+            except CartItem.DoesNotExist:
+                return Response({"error": "Cart item not found."}, status=status.HTTP_404_NOT_FOUND,)
         cart_items = CartItem.objects.all()
-        
         if cart_items.exists():
             serializer = CartItemSerializer(cart_items, many=True)
             return Response(serializer.data)
@@ -110,8 +115,11 @@ class CartItemView(APIView):
 
     @swagger_auto_schema(
         operation_description="Add a new cart item",
+        request_body=CartItemSerializer,  
         responses={201: CartItemSerializer(), 400: 'Invalid data'}
     )
+
+    #post with specific id is not working as it should be
 
     def post(self, request):
         serializer = CartItemSerializer(data=request.data)
@@ -121,33 +129,53 @@ class CartItemView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @swagger_auto_schema(
-        operation_description="Update a cart item",
-        responses={200: CartItemSerializer(), 400: 'Invalid data', 404: 'Cart item not found'}
+        operation_description="Update a cart item by its ID.",
+        responses={
+            200: CartItemSerializer(),
+            400: "Invalid data",
+            404: "Cart item not found or ID not provided",
+        },
+        request_body=CartItemSerializer
     )
+    def put(self, request, cart_item_id=None):
+        if cart_item_id:
+            try:
+                # Fetch the cart item by the ID provided in the URL
+                cart_item = CartItem.objects.get(id=cart_item_id)
+                serializer = CartItemSerializer(cart_item, data=request.data, partial=True)
+                if serializer.is_valid():
+                    serializer.save()
+                    return Response(serializer.data, status=status.HTTP_200_OK)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            except CartItem.DoesNotExist:
+                return Response(
+                    {"error": "Cart item not found."}, status=status.HTTP_404_NOT_FOUND
+                )
+        else:
+            return Response(
+                {"error": "Cart item ID is required to update an item."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
-    def put(self, request):
-        try:
-            cart_item = CartItem.objects.get(id=request.data['id'])
-            serializer = CartItemSerializer(cart_item, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except CartItem.DoesNotExist:
-            return Response({"error": "Cart item not found."}, status=status.HTTP_404_NOT_FOUND)
 
     @swagger_auto_schema(
         operation_description="Delete a cart item",
-        responses={204: 'Cart item deleted', 404: 'Cart item not found'}
+        responses={204: 'Cart item deleted', 404: 'Cart item not found'},
     )
 
-    def delete(self, request):
-        try:
-            cart_item = CartItem.objects.get(id=request.data['id'])
-            cart_item.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        except CartItem.DoesNotExist:
-            return Response({"error": "Cart item not found."}, status=status.HTTP_404_NOT_FOUND)
+    def delete(self, request, cart_item_id=None):
+
+        if cart_item_id:
+            try:
+                cart_item = CartItem.objects.get(id=cart_item_id)
+                cart_item.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            except CartItem.DoesNotExist:
+                return Response({"error": "Cart item not found."}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # If no 'id' is provided, delete all cart items
+            CartItem.objects.all().delete()
+            return Response({"message": "All cart items deleted."}, status=status.HTTP_204_NO_CONTENT)
 
 class CheckoutView(APIView):
 
