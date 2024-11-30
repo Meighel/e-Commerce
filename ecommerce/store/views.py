@@ -7,14 +7,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.permissions import AllowAny
 from uuid import UUID
 from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 class UserView(APIView):
 
     @swagger_auto_schema(
         operation_description="Create a new user",
-        responses={201: 'User created successfully', 400: 'Invalid data'}
+        request_body=UserSerializer,  # Specify the serializer for POST input
+        responses={201: UserSerializer(), 400: 'Invalid data'}
     )
-
     def post(self, request):
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
