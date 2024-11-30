@@ -4,6 +4,7 @@ from rest_framework import status
 from store.models import User, Order, CartItem
 from store.serializers import UserSerializer, OrderSerializer, CartItemSerializer
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny
 from uuid import UUID
 
 class UserView(APIView):
@@ -64,12 +65,12 @@ class OrderView(APIView):
             return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
 
 class CartItemView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         cart_items = CartItem.objects.all()
         
-        if cart_items:
+        if cart_items.exists():
             serializer = CartItemSerializer(cart_items, many=True)
             return Response(serializer.data)
         return Response({"error": "No cart items found."}, status=status.HTTP_404_NOT_FOUND)
@@ -82,12 +83,15 @@ class CartItemView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request):
-        cart_item = CartItem.objects.get(id=request.data['id'])
-        serializer = CartItemSerializer(cart_item, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            cart_item = CartItem.objects.get(id=request.data['id'])
+            serializer = CartItemSerializer(cart_item, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except CartItem.DoesNotExist:
+            return Response({"error": "Cart item not found."}, status=status.HTTP_404_NOT_FOUND)
 
     def delete(self, request):
         try:
@@ -98,26 +102,21 @@ class CartItemView(APIView):
             return Response({"error": "Cart item not found."}, status=status.HTTP_404_NOT_FOUND)
 
 class CheckoutView(APIView):
-    def post(self, request):
-        order = Order.objects.filter(user=request.user, status='Pending').first()
+    def put(self, request, order_id):
+        try:
+            order = Order.objects.get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not order:
-            return Response({"error": "No pending order found."}, status=status.HTTP_400_BAD_REQUEST)
-            
-        if order.cart_items.count() == 0:
-            return Response({"error": "Cart is empty."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        order.status = 'Processed'
-        order.save()
-        return Response({"message": "Order processed successfully."}, status=status.HTTP_200_OK)
-
-    def put(self, request):
-        order = Order.objects.filter(user=request.user, status='Pending').first()
-        if order:
-            order.status = 'Processed' 
+        if order.status == 'Pending':
+            order.status = 'Processed'
             order.save()
             return Response({"message": "Order processed successfully."}, status=status.HTTP_200_OK)
-        return Response({"error": "No pending order found."}, status=status.HTTP_400_BAD_REQUEST)
+        elif order.status == 'Processed':
+            return Response({"message": "Order has already been processed."}, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "Invalid order status."}, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 

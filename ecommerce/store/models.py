@@ -46,7 +46,7 @@ class Order(models.Model):
 
 class CartItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    order = models.ForeignKey(Order, related_name='cart_items', on_delete=models.CASCADE)
+    order = models.ForeignKey(Order, related_name='cart_items', on_delete=models.CASCADE, null=True, blank=True)
     product_name = models.CharField(max_length=255)
     quantity = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
