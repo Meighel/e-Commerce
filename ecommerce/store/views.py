@@ -62,35 +62,62 @@ class OrderView(APIView):
             return Response(serializer.data)
         except Order.DoesNotExist:
             return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+    @swagger_auto_schema(
+        operation_description="Create a new order",
+        request_body=OrderSerializer,  # Expecting data in the format defined by the OrderSerializer
+        responses={201: OrderSerializer(), 400: "Invalid data"}
+    )
+    def post(self, request):
+        serializer = OrderSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @swagger_auto_schema(
         operation_description="Update an order status or details",
-        responses={200: OrderSerializer(), 400: 'Bad request', 404: 'Order not found'}
+        responses={200: OrderSerializer(), 400: "Bad request", 404: "Order not found"},
+        request_body=OrderSerializer,
     )
+    def put(self, request, order_id=None):
+        if order_id:
+            try:
+                # Fetch the order by the ID provided in the URL
+                order = Order.objects.get(id=order_id)
+                serializer = OrderSerializer(order, data=request.data, partial=True)
+                if serializer.is_valid():
+                    serializer.save()
+                    return Response(serializer.data)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            except Order.DoesNotExist:
+                return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response({"error": "Order ID must be provided."}, status=status.HTTP_400_BAD_REQUEST)
 
-    def put(self, request):
-        try:
-            order = Order.objects.get(id=request.data['id'])
-            serializer = OrderSerializer(order, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except Order.DoesNotExist:
-            return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
 
     @swagger_auto_schema(
-        operation_description="Delete an order by ID",
-        responses={204: 'Order deleted successfully', 404: 'Order not found'}
+        operation_description="Delete an order by ID or delete all orders if no ID is provided.",
+        responses={
+            204: "Order deleted successfully or all orders deleted",
+            404: "Order not found",
+        },
     )
+    def delete(self, request, order_id=None):
+        if order_id:
+            try:
+                order = Order.objects.get(id=order_id)
+                order.delete()
+                return Response({"message": f"Order with ID {order_id} deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+            except Order.DoesNotExist:
+                return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            deleted_count, _ = Order.objects.all().delete()
+            return Response(
+                {"message": f"All orders ({deleted_count}) deleted successfully."},
+                status=status.HTTP_204_NO_CONTENT,
+            )
 
-    def delete(self, request):
-        try:
-            order = Order.objects.get(id=request.data['id'])
-            order.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        except Order.DoesNotExist:
-            return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
 
 class CartItemView(APIView):
     permission_classes = [AllowAny]
@@ -101,7 +128,6 @@ class CartItemView(APIView):
     )
 
     def get(self, request, cart_item_id=None):
-
         if cart_item_id:
             try:
                 cart_item_id = CartItem.objects.get(id=cart_item_id)
@@ -164,7 +190,6 @@ class CartItemView(APIView):
     )
 
     def delete(self, request, cart_item_id=None):
-
         if cart_item_id:
             try:
                 cart_item = CartItem.objects.get(id=cart_item_id)
