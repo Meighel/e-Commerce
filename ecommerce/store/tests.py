@@ -1,23 +1,34 @@
 from django.test import TestCase
-from store.models import User
+from rest_framework import status
+from django.urls import reverse
+from rest_framework.test import APIClient
+from store.models import User  # Adjust import based on your app's models
 
-class UserModelTest(TestCase):
+class UserAuthenticationTest(TestCase):
+    
     def setUp(self):
-        # Create a sample user for testing
-        self.user = User.objects.create(
-            name="Test User",
-            email="test@example.com",
-            address="123 Test Lane",
-            phone="123-456-7890"
-        )
+        # Create a user to use for valid authentication tests
+        self.user = User.objects.create_user(username='testuser', password='password123')
 
-    def test_user_creation(self):
-        # Test that the user is created correctly
-        self.assertEqual(self.user.name, "Test User")
-        self.assertEqual(self.user.email, "test@example.com")
-        self.assertEqual(self.user.address, "123 Test Lane")
-        self.assertEqual(self.user.phone, "123-456-7890")
+        # Set up the API client
+        self.client = APIClient()
 
-    def test_str_method(self):
-        # Test the __str__ method of the User model
-        self.assertEqual(str(self.user), "Test User")
+        # Define your protected URL (adjust to the specific view you want to test)
+        self.url = reverse('user-list')  # Adjust to the actual URL name
+
+    def test_unauthorized_access_without_credentials(self):
+        # Test that trying to access the protected resource without credentials returns 401
+        response = self.client.get(self.url)  # Make a GET request without any authentication
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)  # Check for 401 Unauthorized
+
+    def test_unauthorized_access_with_invalid_credentials(self):
+        # Test that providing invalid credentials returns 401
+        self.client.credentials(HTTP_AUTHORIZATION='Basic invalid_token')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)  # Check for 401 Unauthorized
+
+    def test_authorized_access_with_valid_credentials(self):
+        # Log in with valid credentials
+        self.client.login(username='testuser', password='password123')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)  # Should be OK if credentials are valid
