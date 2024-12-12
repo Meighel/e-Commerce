@@ -157,28 +157,17 @@ class OrderDetailView(APIView):
         except Order.DoesNotExist:
             return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
 
-
-
-
-class CartItemView(APIView):
+class CartItemListView(APIView):
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
         operation_description="Get all cart items",
         responses={200: CartItemSerializer(many=True), 404: 'No cart items found', 401: 'Unauthorized'}
     )
-    def get(self, request, cart_item_id=None):
+    def get(self, request):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        if cart_item_id:
-            try:
-                cart_item = CartItem.objects.get(id=cart_item_id)
-            except CartItem.DoesNotExist:
-                return Response({"error": "Cart item not found."}, status=status.HTTP_404_NOT_FOUND)
-            serializer = CartItemSerializer(cart_item)
-            return Response(serializer.data)
-        
         cart_items = CartItem.objects.all()
         if cart_items.exists():
             serializer = CartItemSerializer(cart_items, many=True)
@@ -186,8 +175,8 @@ class CartItemView(APIView):
         return Response({"error": "No cart items found."}, status=status.HTTP_404_NOT_FOUND)
 
     @swagger_auto_schema(
-        operation_description="Add a new cart item",
-        request_body=CartItemSerializer,  
+        operation_description="Create a new cart item",
+        request_body=CartItemSerializer,
         responses={201: CartItemSerializer(), 400: 'Invalid data', 401: 'Unauthorized'}
     )
     def post(self, request):
@@ -199,15 +188,44 @@ class CartItemView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     @swagger_auto_schema(
-        operation_description="Update a cart item by its ID.",
-        responses={
-            200: CartItemSerializer(),
-            400: "Invalid data",
-            404: "Cart item not found or ID not provided",
-            401: 'Unauthorized'
-        },
+        operation_description="Delete all cart items",
+        responses={200: 'All cart items deleted', 401: 'Unauthorized'}
+    )
+    def delete(self, request):
+        if not request.user.is_authenticated:
+            return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        deleted_count, _ = CartItem.objects.all().delete()
+        return Response(
+            {"message": f"All cart items ({deleted_count}) deleted successfully."},
+            status=status.HTTP_200_OK,
+        )
+
+class CartItemDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Get a specific cart item by ID",
+        responses={200: CartItemSerializer(), 404: 'Cart item not found', 401: 'Unauthorized'}
+    )
+    def get(self, request, cart_item_id=None):
+        if not request.user.is_authenticated:
+            return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if cart_item_id:
+            try:
+                cart_item = CartItem.objects.get(id=cart_item_id)
+                serializer = CartItemSerializer(cart_item)
+                return Response(serializer.data)
+            except CartItem.DoesNotExist:
+                return Response({"error": "Cart item not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "Cart item ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    @swagger_auto_schema(
+        operation_description="Update a specific cart item by ID",
+        responses={200: CartItemSerializer(), 400: "Invalid data", 404: "Cart item not found", 401: 'Unauthorized'},
         request_body=CartItemSerializer
     )
     def put(self, request, cart_item_id=None):
@@ -223,34 +241,24 @@ class CartItemView(APIView):
                     return Response(serializer.data, status=status.HTTP_200_OK)
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             except CartItem.DoesNotExist:
-                return Response(
-                    {"error": "Cart item not found."}, status=status.HTTP_404_NOT_FOUND
-                )
-        else:
-            return Response(
-                {"error": "Cart item ID is required to update an item."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+                return Response({"error": "Cart item not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "Cart item ID is required."}, status=status.HTTP_400_BAD_REQUEST)
 
     @swagger_auto_schema(
-        operation_description="Delete a cart item",
-        responses={204: 'Cart item deleted', 404: 'Cart item not found', 401: 'Unauthorized'},
+        operation_description="Delete a specific cart item",
+        responses={204: 'Cart item deleted', 404: 'Cart item not found', 401: 'Unauthorized'}
     )
     def delete(self, request, cart_item_id=None):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        if cart_item_id:
-            try:
-                cart_item = CartItem.objects.get(id=cart_item_id)
-                cart_item.delete()
-                return Response(status=status.HTTP_204_NO_CONTENT)
-            except CartItem.DoesNotExist:
-                return Response({"error": "Cart item not found."}, status=status.HTTP_404_NOT_FOUND)
-        else:
-            # If no 'id' is provided, delete all cart items
-            CartItem.objects.all().delete()
-            return Response({"message": "All cart items deleted."}, status=status.HTTP_204_NO_CONTENT)
+        try:
+            cart_item = CartItem.objects.get(id=cart_item_id)
+            cart_item.delete()
+            return Response({"message": f"Cart item with ID {cart_item_id} deleted successfully."})
+        except CartItem.DoesNotExist:
+            return Response({"error": "Cart item not found."}, status=status.HTTP_404_NOT_FOUND)
+
 
 class CheckoutView(APIView):
     permission_classes = [IsAuthenticated]
