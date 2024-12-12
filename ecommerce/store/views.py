@@ -9,11 +9,16 @@ from uuid import UUID
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
-class UserView(APIView):
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import User
+from .serializers import UserSerializer
 
+class UserListCreateView(APIView):
     @swagger_auto_schema(
         operation_description="Create a new user",
-        request_body=UserSerializer,  
+        request_body=UserSerializer,
         responses={201: UserSerializer(), 400: 'Invalid data'}
     )
     def post(self, request):
@@ -24,23 +29,25 @@ class UserView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @swagger_auto_schema(
+        operation_description="List all users",
+        responses={200: UserSerializer(many=True)}
+    )
+    def get(self, request):
+        users = User.objects.all()
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data)
+
+class UserDetailView(APIView):
+    @swagger_auto_schema(
         operation_description="Retrieve user information",
         responses={200: UserSerializer(), 404: 'User not found'}
     )
-    def get(self, request, user_id=None):
-        if user_id:
-            try:
-                user = User.objects.get(id=user_id)
-            except User.DoesNotExist:
-                return Response(
-                    {"error": "User not found"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-            serializer = UserSerializer(user)
-            return Response(serializer.data)
-        
-        users = User.objects.all()
-        serializer = UserSerializer(users, many=True)
+    def get(self, request, user_id):
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        serializer = UserSerializer(user)
         return Response(serializer.data)
 
 
