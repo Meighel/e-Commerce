@@ -51,32 +51,24 @@ class UserDetailView(APIView):
         return Response(serializer.data)
 
 
-class OrderView(APIView):
-
+class OrderListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
-        operation_description="Get details of an order by its ID",
-        responses={200: OrderSerializer(), 404: 'Order not found', 401: 'Unauthorized'}
+        operation_description="List all orders",
+        responses={200: OrderSerializer(many=True), 401: 'Unauthorized'}
     )
-    def get(self, request, order_id=None):
+    def get(self, request):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
-            
-        try:
-            if order_id:
-                order = Order.objects.get(id=order_id)
-                serializer = OrderSerializer(order)
-                return Response(serializer.data)
-            orders = Order.objects.all()
-            serializer = OrderSerializer(orders, many=True)
-            return Response(serializer.data)
-        except Order.DoesNotExist:
-            return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
         
+        orders = Order.objects.all()
+        serializer = OrderSerializer(orders, many=True)
+        return Response(serializer.data)
+
     @swagger_auto_schema(
         operation_description="Create a new order",
-        request_body=OrderSerializer,  # Expecting data in the format defined by the OrderSerializer
+        request_body=OrderSerializer,
         responses={201: OrderSerializer(), 400: "Invalid data", 401: 'Unauthorized'}
     )
     def post(self, request):
@@ -90,52 +82,82 @@ class OrderView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @swagger_auto_schema(
-        operation_description="Update an order status or details",
-        responses={200: OrderSerializer(), 400: "Bad request", 404: "Order not found", 401: 'Unauthorized'},
-        request_body=OrderSerializer,
+        operation_description="Delete all orders",
+        responses={
+            200: "All orders deleted successfully",
+            401: 'Unauthorized'
+        }
     )
-    def put(self, request, order_id=None):
+    def delete(self, request):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
-            
-        if order_id:
-            try:
-                order = Order.objects.get(id=order_id)
-                serializer = OrderSerializer(order, data=request.data, partial=True)
-                if serializer.is_valid():
-                    serializer.save()
-                    return Response(serializer.data)
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            except Order.DoesNotExist:
-                return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
-        else:
-            return Response({"error": "Order ID must be provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        deleted_count, _ = Order.objects.all().delete()
+        return Response(
+            {"message": f"All orders ({deleted_count}) deleted successfully."},
+            status=status.HTTP_200_OK,  # Using 200 OK to include a response body
+        )
+
+class OrderDetailView(APIView):
+    permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
-        operation_description="Delete an order by ID or delete all orders if no ID is provided.",
-        responses={
-            204: "Order deleted successfully or all orders deleted",
-            404: "Order not found", 
-            401: 'Unauthorized'
-        },
+        operation_description="Get details of an order by its ID",
+        responses={200: OrderSerializer(), 404: 'Order not found', 401: 'Unauthorized'}
     )
-    def delete(self, request, order_id=None):
+    def get(self, request, order_id):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        if order_id:
-            try:
-                order = Order.objects.get(id=order_id)
-                order.delete()
-                return Response({"message": f"Order with ID {order_id} deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
-            except Order.DoesNotExist:
-                return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
-        else:
-            deleted_count, _ = Order.objects.all().delete()
+
+        try:
+            order = Order.objects.get(id=order_id)
+            serializer = OrderSerializer(order)
+            return Response(serializer.data)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    @swagger_auto_schema(
+        operation_description="Update an order status or details",
+        request_body=OrderSerializer,
+        responses={200: OrderSerializer(), 400: "Bad request", 404: "Order not found", 401: 'Unauthorized'}
+    )
+    def put(self, request, order_id):
+        if not request.user.is_authenticated:
+            return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        try:
+            order = Order.objects.get(id=order_id)
+            serializer = OrderSerializer(order, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    @swagger_auto_schema(
+        operation_description="Delete an order by its ID",
+        responses={
+            200: "Order deleted successfully",
+            404: "Order not found",
+            401: 'Unauthorized'
+        }
+    )
+    def delete(self, request, order_id):
+        if not request.user.is_authenticated:
+            return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        try:
+            order = Order.objects.get(id=order_id)
+            order.delete()
             return Response(
-                {"message": f"All orders ({deleted_count}) deleted successfully."},
-                status=status.HTTP_204_NO_CONTENT,
+                {"message": f"Order with ID {order_id} deleted successfully."},
+                status=status.HTTP_200_OK,  # Using 200 OK to include a response body
             )
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+
 
 
 class CartItemView(APIView):
