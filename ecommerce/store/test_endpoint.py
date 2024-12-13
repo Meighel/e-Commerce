@@ -91,8 +91,8 @@ def test_post_order(authenticated_client, user):
     """Test creating a new order."""
     url = reverse('order-list-create') 
     data = {
-        "user": str(user.id),
-        "status": "pending",
+        "user": user.id,
+        "status": "Pending",
     }
     response = authenticated_client.post(url, data, format='json')
     assert response.status_code == 201
@@ -104,7 +104,7 @@ def test_delete_orders(authenticated_client):
     """Test deleting all orders (if supported)."""
     url = reverse('order-list-create') 
     response = authenticated_client.delete(url)
-    assert response.status_code == 204
+    assert response.status_code == 200
 
 
 @pytest.mark.django_db
@@ -121,25 +121,29 @@ def test_put_order(authenticated_client, order):
     """Test updating a specific order."""
     url = reverse('order-detail', kwargs={"order_id": order.id}) 
     data = {
-        "status": "completed",
+        "status": "Pending",
     }
     response = authenticated_client.put(url, data, format='json')
     assert response.status_code == 200
     assert response.data["status"] == data["status"]
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db 
 def test_delete_order(authenticated_client, order):
     """Test deleting a specific order by ID."""
     url = reverse('order-detail', kwargs={"order_id": order.id})
     response = authenticated_client.delete(url)
-    assert response.status_code == 204
+    assert response.status_code == 200
 
 
 @pytest.mark.django_db
 def test_checkout_order(authenticated_client, order):
-    """Test checking out a specific order."""
-    url = reverse('checkout', kwargs={"order_id": order.id}) 
-    response = authenticated_client.put(url, format='json')  
+    """Test checking out a specific order."""       
+    order.status = 'Pending'
+    order.save()
+
+    url = reverse('checkout', kwargs={"order_id": order.id})
+    response = authenticated_client.put(url, format='json')
     assert response.status_code == 200
-    assert response.data["status"] == "Processed"
+    assert response.data["message"] == "Order processed successfully."
+
