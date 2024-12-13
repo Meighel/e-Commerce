@@ -17,8 +17,6 @@ from .serializers import UserSerializer
 
 class UserListCreateView(APIView):
 
-    permission_classes = [AllowAny] 
-
     @swagger_auto_schema(
         operation_description="Create a new user",
         request_body=UserSerializer,
@@ -41,8 +39,6 @@ class UserListCreateView(APIView):
         return Response(serializer.data)
 
 class UserDetailView(APIView):
-
-    permission_classes = [AllowAny] 
 
     @swagger_auto_schema(
         operation_description="Retrieve user information",

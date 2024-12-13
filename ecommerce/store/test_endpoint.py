@@ -1,8 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
-from django.contrib.auth.hashers import make_password, check_password
 from django.urls import reverse
-from store.models import User
+from store.models import User, Order
 
 
 @pytest.fixture
@@ -24,17 +23,27 @@ def user(db):
 @pytest.fixture
 def authenticated_client(client, user):
     """Fixture for an authenticated client."""
-    user.is_authenticated = True 
+    user.is_authenticated = True
     client.force_authenticate(user=user)
     return client
 
 
+@pytest.fixture
+def order(db, user):
+    """Fixture for creating a test order."""
+    return Order.objects.create(
+        user=user,
+        status="pending"
+    )
+
+#USERS
 @pytest.mark.django_db
 def test_user_list(authenticated_client):
     """Test retrieving the list of users."""
     url = reverse('user-list-create')  
     response = authenticated_client.get(url)
     assert response.status_code == 200
+
 
 @pytest.mark.django_db
 def test_post_user(authenticated_client):
@@ -48,28 +57,89 @@ def test_post_user(authenticated_client):
 
     response = authenticated_client.post(url, data, format='json')
 
-    # Assert the response status code
     assert response.status_code == 201
-
-    # Verify the created user's data in the response
     assert response.data['name'] == data['name']
     assert response.data['email'] == data['email']
 
-    # Verify the user is created in the database
     created_user = User.objects.get(email=data['email'])
     assert created_user.name == data['name']
     assert created_user.email == data['email']
-
-    # Verify that the password matches directly (not hashed)
     assert created_user.password == data['password']
 
 
-
+#ORDERS
 @pytest.mark.django_db
 def test_get_user_detail(authenticated_client, user):
     """Test retrieving details of a specific user."""
-    url = reverse('user-detail', kwargs={'user_id': str(user.id)})  # Use 'user_id' instead of 'pk'
+    url = reverse('user-detail', kwargs={'user_id': str(user.id)}) 
     response = authenticated_client.get(url)
     assert response.status_code == 200
     assert response.data["name"] == user.name
     assert response.data["email"] == user.email
+
+
+@pytest.mark.django_db
+def test_get_orders(authenticated_client):
+    """Test retrieving all orders."""
+    url = reverse('order-list-create') 
+    response = authenticated_client.get(url)
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_post_order(authenticated_client, user):
+    """Test creating a new order."""
+    url = reverse('order-list-create') 
+    data = {
+        "user": str(user.id),
+        "status": "pending",
+    }
+    response = authenticated_client.post(url, data, format='json')
+    assert response.status_code == 201
+    assert response.data["status"] == data["status"]
+
+
+@pytest.mark.django_db
+def test_delete_orders(authenticated_client):
+    """Test deleting all orders (if supported)."""
+    url = reverse('order-list-create') 
+    response = authenticated_client.delete(url)
+    assert response.status_code == 204
+
+
+@pytest.mark.django_db
+def test_get_order_detail(authenticated_client, order):
+    """Test retrieving a specific order by ID."""
+    url = reverse('order-detail', kwargs={"order_id": order.id}) 
+    response = authenticated_client.get(url)
+    assert response.status_code == 200
+    assert response.data["id"] == str(order.id)
+
+
+@pytest.mark.django_db
+def test_put_order(authenticated_client, order):
+    """Test updating a specific order."""
+    url = reverse('order-detail', kwargs={"order_id": order.id}) 
+    data = {
+        "status": "completed",
+    }
+    response = authenticated_client.put(url, data, format='json')
+    assert response.status_code == 200
+    assert response.data["status"] == data["status"]
+
+
+@pytest.mark.django_db
+def test_delete_order(authenticated_client, order):
+    """Test deleting a specific order by ID."""
+    url = reverse('order-detail', kwargs={"order_id": order.id})
+    response = authenticated_client.delete(url)
+    assert response.status_code == 204
+
+
+@pytest.mark.django_db
+def test_checkout_order(authenticated_client, order):
+    """Test checking out a specific order."""
+    url = reverse('checkout', kwargs={"order_id": order.id}) 
+    response = authenticated_client.put(url, format='json')  
+    assert response.status_code == 200
+    assert response.data["status"] == "Processed"
