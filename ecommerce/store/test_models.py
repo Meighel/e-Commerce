@@ -10,9 +10,16 @@ def test_user_creation():
     user = User.objects.create(
         name="Test User",
         email="testuser@example.com",
+        address = "Manila, Philippines",
+        phone = "09246387490", 
+        password = "testerpassword", 
+
     )
     assert user.name == "Test User"
     assert user.email == "testuser@example.com"
+    assert user.address == "Manila, Philippines"
+    assert user.phone == "09246387490" 
+    assert user.password == "testerpassword" 
 
 
 @pytest.mark.django_db
