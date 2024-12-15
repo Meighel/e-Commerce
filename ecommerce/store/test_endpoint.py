@@ -181,7 +181,7 @@ def test_checkout_order(authenticated_client, user, order):
     pending_order = Order.objects.create(user=user, status="Pending")
 
     url = reverse('checkout', kwargs={"order_id": pending_order.id})
-    response = authenticated_client.put(url)  # Use PUT instead of POST
+    response = authenticated_client.put(url)
 
     assert response.status_code == 200
     assert response.data["message"] == "Order processed successfully."

@@ -97,7 +97,7 @@ class OrderListCreateView(APIView):
         deleted_count, _ = Order.objects.all().delete()
         return Response(
             {"message": f"All orders ({deleted_count}) deleted successfully."},
-            status=status.HTTP_200_OK,  # Using 200 OK to include a response body
+            status=status.HTTP_200_OK, 
         )
 
 class OrderDetailView(APIView):
@@ -154,7 +154,7 @@ class OrderDetailView(APIView):
             order.delete()
             return Response(
                 {"message": f"Order with ID {order_id} deleted successfully."},
-                status=status.HTTP_200_OK,  # Using 200 OK to include a response body
+                status=status.HTTP_200_OK,
             )
         except Order.DoesNotExist:
             return Response({"error": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -210,7 +210,7 @@ class CartItemDetailView(APIView):
 
     @swagger_auto_schema(
         operation_description="Get a specific cart item by ID",
-        responses={200: CartItemSerializer(), 404: 'Cart item not found', 401: 'Unauthorized'}
+        responses={200: CartItemSerializer(), 404: 'Cart item not found', 401: 'Unauthorized', 400: 'Cart item ID is required'}
     )
     def get(self, request, cart_item_id=None):
         if not request.user.is_authenticated:
