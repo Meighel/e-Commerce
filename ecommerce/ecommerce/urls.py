@@ -31,8 +31,8 @@ schema_view = get_schema_view(
         contact=openapi.Contact(email="contact@yourdomain.local"),
         license=openapi.License(name="BSD License"),
     ),
-    public=True,
-    permission_classes=(permissions.AllowAny, permissions.IsAuthenticated,),  # Allows public access to Swagger UI
+    public=False,
+    permission_classes=(permissions.AllowAny, permissions.IsAuthenticated,),
     authentication_classes=[BasicAuthentication],
 )
 
