@@ -97,6 +97,8 @@ def test_post_user(authenticated_client):
     created_user = User.objects.get(email=data['email'])
     assert created_user.name == data['name']
     assert created_user.email == data['email']
+    assert created_user.address == data['address']
+    assert created_user.phone == data['phone']
     assert created_user.password == data['password']
 
 
@@ -108,6 +110,9 @@ def test_get_user_detail(authenticated_client, user):
     assert response.status_code == 200
     assert response.data["name"] == user.name
     assert response.data["email"] == user.email
+    assert response.data['address'] == user.address
+    assert response.data['phone'] == user.phone
+    assert response.data['password'] == user.password
 
 
 #ORDERS
