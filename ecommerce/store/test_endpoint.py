@@ -210,6 +210,13 @@ def test_create_cart_item(authenticated_client, cart_item_data):
     assert response.status_code == 201
     assert CartItem.objects.filter(product_name=cart_item_data["product_name"]).exists()
 
+@pytest.mark.django_db
+def test_delete_cart_items(authenticated_client):
+    """Test deleting all cart items."""
+    url = reverse('cart-item-list')
+    response = authenticated_client.delete(url)
+    assert response.status_code == 200
+
 
 @pytest.mark.django_db
 def test_get_cart_item(authenticated_client, cart_item):
