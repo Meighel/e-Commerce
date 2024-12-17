@@ -1,18 +1,20 @@
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
-from store.models import User  
+from .models import User
 
 class CustomUserIDAuthentication(BaseAuthentication):
     def authenticate(self, request):
-        # Fetch HTTP_X_USER_ID from request headers
-        user_id = request.headers.get("HTTP_X_USER_ID")
+        # Get user ID from the request headers
+        user_id = request.META.get('HTTP_X_USER_ID')
+        
         if not user_id:
-            raise AuthenticationFailed("Missing HTTP_X_USER_ID header")
-        
+            raise AuthenticationFailed('User ID header missing')
+
         try:
-            # Validate if user exists in the database
+            # Find the user by UUID (using the user ID passed in the header)
             user = User.objects.get(id=user_id)
+
         except User.DoesNotExist:
-            raise AuthenticationFailed("Invalid user ID")
-        
-        return (user, None)  
+            raise AuthenticationFailed('No such user')
+
+        return (user, None)

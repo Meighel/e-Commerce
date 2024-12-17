@@ -14,8 +14,21 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import User
 from .serializers import UserSerializer
+from .authentication import CustomUserIDAuthentication
+
+
+user_id_header = openapi.Parameter(
+        name="HTTP_X_USER_ID",
+        in_=openapi.IN_HEADER,
+        description="UUID of the user",
+        type=openapi.TYPE_STRING
+
+)
+
 
 class UserListCreateView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
 
     @swagger_auto_schema(
         operation_description="Create a new user",
@@ -39,6 +52,8 @@ class UserListCreateView(APIView):
         return Response(serializer.data)
 
 class UserDetailView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
 
     @swagger_auto_schema(
         operation_description="Retrieve user information",
@@ -55,23 +70,26 @@ class UserDetailView(APIView):
 
 class OrderListCreateView(APIView):
     permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomUserIDAuthentication]
 
     @swagger_auto_schema(
         operation_description="List all orders",
-        responses={200: OrderSerializer(many=True), 401: 'Unauthorized'}
+        responses={200: OrderSerializer(many=True), 401: 'Unauthorized'},
+        manual_parameters = [user_id_header]
     )
     def get(self, request):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
         
-        orders = Order.objects.all()
+        orders = Order.objects.filter(user=request.user)
         serializer = OrderSerializer(orders, many=True)
         return Response(serializer.data)
 
     @swagger_auto_schema(
         operation_description="Create a new order",
         request_body=OrderSerializer,
-        responses={201: OrderSerializer(), 400: "Invalid data", 401: 'Unauthorized'}
+        responses={201: OrderSerializer(), 400: "Invalid data", 401: 'Unauthorized'},
+        manual_parameters = [user_id_header]
     )
     def post(self, request):
         if not request.user.is_authenticated:
@@ -79,7 +97,7 @@ class OrderListCreateView(APIView):
 
         serializer = OrderSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(user=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -88,13 +106,14 @@ class OrderListCreateView(APIView):
         responses={
             200: "All orders deleted successfully",
             401: 'Unauthorized'
-        }
+        },
+        manual_parameters = [user_id_header]
     )
     def delete(self, request):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        deleted_count, _ = Order.objects.all().delete()
+        deleted_count, _ = Order.objects.filter(user=request.user).delete()
         return Response(
             {"message": f"All orders ({deleted_count}) deleted successfully."},
             status=status.HTTP_200_OK, 
@@ -102,17 +121,19 @@ class OrderListCreateView(APIView):
 
 class OrderDetailView(APIView):
     permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomUserIDAuthentication]
 
     @swagger_auto_schema(
         operation_description="Get details of an order by its ID",
-        responses={200: OrderSerializer(), 404: 'Order not found', 401: 'Unauthorized'}
+        responses={200: OrderSerializer(), 404: 'Order not found', 401: 'Unauthorized'},
+        manual_parameters = [user_id_header]
     )
     def get(self, request, order_id):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
         try:
-            order = Order.objects.get(id=order_id)
+            order = Order.objects.get(id=order_id, user=request.user)
             serializer = OrderSerializer(order)
             return Response(serializer.data)
         except Order.DoesNotExist:
@@ -121,14 +142,15 @@ class OrderDetailView(APIView):
     @swagger_auto_schema(
         operation_description="Update an order status or details",
         request_body=OrderSerializer,
-        responses={200: OrderSerializer(), 400: "Bad request", 404: "Order not found", 401: 'Unauthorized'}
+        responses={200: OrderSerializer(), 400: "Bad request", 404: "Order not found", 401: 'Unauthorized'},
+        manual_parameters = [user_id_header]
     )
     def put(self, request, order_id):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
         try:
-            order = Order.objects.get(id=order_id)
+            order = Order.objects.get(id=order_id, user=request.user)
             serializer = OrderSerializer(order, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -143,14 +165,15 @@ class OrderDetailView(APIView):
             200: "Order deleted successfully",
             404: "Order not found",
             401: 'Unauthorized'
-        }
+        },
+        manual_parameters = [user_id_header]
     )
     def delete(self, request, order_id):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
         try:
-            order = Order.objects.get(id=order_id)
+            order = Order.objects.get(id=order_id, user=request.user)
             order.delete()
             return Response(
                 {"message": f"Order with ID {order_id} deleted successfully."},
@@ -161,16 +184,18 @@ class OrderDetailView(APIView):
 
 class CartItemListView(APIView):
     permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomUserIDAuthentication]
 
     @swagger_auto_schema(
         operation_description="Get all cart items",
-        responses={200: CartItemSerializer(many=True), 404: 'No cart items found', 401: 'Unauthorized'}
+        responses={200: CartItemSerializer(many=True), 404: 'No cart items found', 401: 'Unauthorized'},
+        manual_parameters = [user_id_header]
     )
     def get(self, request):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        cart_items = CartItem.objects.all()
+        cart_items = CartItem.objects.filter(order__user=request.user) 
         if cart_items.exists():
             serializer = CartItemSerializer(cart_items, many=True)
             return Response(serializer.data)
@@ -179,27 +204,30 @@ class CartItemListView(APIView):
     @swagger_auto_schema(
         operation_description="Create a new cart item",
         request_body=CartItemSerializer,
-        responses={201: CartItemSerializer(), 400: 'Invalid data', 401: 'Unauthorized'}
+        responses={201: CartItemSerializer(), 400: 'Invalid data', 401: 'Unauthorized'},
+        manual_parameters = [user_id_header]
     )
     def post(self, request):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        serializer = CartItemSerializer(data=request.data)
+        serializer = CartItemSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
     @swagger_auto_schema(
         operation_description="Delete all cart items",
-        responses={200: 'All cart items deleted', 401: 'Unauthorized'}
+        responses={200: 'All cart items deleted', 401: 'Unauthorized'},
+        manual_parameters = [user_id_header]
     )
     def delete(self, request):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        deleted_count, _ = CartItem.objects.all().delete()
+        deleted_count, _ = CartItem.objects.filter(order__user=request.user).delete()
         return Response(
             {"message": f"All cart items ({deleted_count}) deleted successfully."},
             status=status.HTTP_200_OK,
@@ -207,10 +235,12 @@ class CartItemListView(APIView):
 
 class CartItemDetailView(APIView):
     permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomUserIDAuthentication]
 
     @swagger_auto_schema(
         operation_description="Get a specific cart item by ID",
-        responses={200: CartItemSerializer(), 404: 'Cart item not found', 401: 'Unauthorized', 400: 'Cart item ID is required'}
+        responses={200: CartItemSerializer(), 404: 'Cart item not found', 401: 'Unauthorized', 400: 'Cart item ID is required'},
+        manual_parameters = [user_id_header]
     )
     def get(self, request, cart_item_id=None):
         if not request.user.is_authenticated:
@@ -218,7 +248,7 @@ class CartItemDetailView(APIView):
 
         if cart_item_id:
             try:
-                cart_item = CartItem.objects.get(id=cart_item_id)
+                cart_item = CartItem.objects.get(id=cart_item_id, order__user=request.user)
                 serializer = CartItemSerializer(cart_item)
                 return Response(serializer.data)
             except CartItem.DoesNotExist:
@@ -228,7 +258,8 @@ class CartItemDetailView(APIView):
     @swagger_auto_schema(
         operation_description="Update a specific cart item by ID",
         responses={200: CartItemSerializer(), 400: "Invalid data", 404: "Cart item not found", 401: 'Unauthorized'},
-        request_body=CartItemSerializer
+        request_body=CartItemSerializer,
+        manual_parameters = [user_id_header]
     )
     def put(self, request, cart_item_id=None):
         if not request.user.is_authenticated:
@@ -236,7 +267,7 @@ class CartItemDetailView(APIView):
 
         if cart_item_id:
             try:
-                cart_item = CartItem.objects.get(id=cart_item_id)
+                cart_item = CartItem.objects.get(id=cart_item_id, order__user=request.user)  
                 serializer = CartItemSerializer(cart_item, data=request.data, partial=True)
                 if serializer.is_valid():
                     serializer.save()
@@ -248,14 +279,15 @@ class CartItemDetailView(APIView):
 
     @swagger_auto_schema(
         operation_description="Delete a specific cart item",
-        responses={204: 'Cart item deleted', 404: 'Cart item not found', 401: 'Unauthorized'}
+        responses={204: 'Cart item deleted', 404: 'Cart item not found', 401: 'Unauthorized'},
+        manual_parameters = [user_id_header]
     )
     def delete(self, request, cart_item_id=None):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
         try:
-            cart_item = CartItem.objects.get(id=cart_item_id)
+            cart_item = CartItem.objects.get(id=cart_item_id, order__user=request.user)
             cart_item.delete()
             return Response({"message": f"Cart item with ID {cart_item_id} deleted successfully."})
         except CartItem.DoesNotExist:
@@ -264,17 +296,19 @@ class CartItemDetailView(APIView):
 
 class CheckoutView(APIView):
     permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomUserIDAuthentication]
 
     @swagger_auto_schema(
         operation_description="Process an order by changing its status to 'Processed'",
-        responses={200: 'Order processed successfully', 400: 'Invalid order status', 404: 'Order not found', 401: 'Unauthorized'}
+        responses={200: 'Order processed successfully', 400: 'Invalid order status', 404: 'Order not found', 401: 'Unauthorized'},
+        manual_parameters = [user_id_header]
     )
     def put(self, request, order_id):
         if not request.user.is_authenticated:
             return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
         try:
-            order = Order.objects.get(id=order_id)
+            order = Order.objects.get(id=order_id, user=request.user) 
         except Order.DoesNotExist:
             return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
 

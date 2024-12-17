@@ -11,8 +11,17 @@ class User(models.Model):
     phone = models.CharField(max_length=20, null=True, blank=True)
     password = models.CharField(max_length=128, null=True, blank=True)
     
+    @property
+    def is_authenticated(self):
+        # You can customize this as needed, but generally returns True if the user exists.
+        return True
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.name
+
 
 class Order(models.Model):
     STATUS_CHOICES = [
@@ -43,6 +52,7 @@ class Order(models.Model):
     def __str__(self):
         return f"Order {self.id} - {self.status}"
 
+
 class CartItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order = models.ForeignKey(Order, related_name='cart_items', on_delete=models.CASCADE, null=True, blank=True)
@@ -51,4 +61,4 @@ class CartItem(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):
-        return self.product_name
+        return f"{self.product_name} (x{self.quantity})"
